@@ -1,5 +1,5 @@
 {
-  "name": "cloudguard-dashboard",
+  "name": "CloudGuardDataImporter",
   "version": "1.0.0",
   "description": "",
   "main": "src/index.js",
