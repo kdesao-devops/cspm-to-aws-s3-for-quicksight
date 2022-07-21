@@ -30,7 +30,8 @@ override.tf.json
 
 # Code Artifacts
 *.zip
-/lambda/node_modules/
+/lambda/dataImporter/node_modules/
+/lambda/dataTransformer/node_modules/
 
 # IDE Resources
 .idea
