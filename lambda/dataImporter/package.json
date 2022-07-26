@@ -1,0 +1,27 @@
+{
+  "name": "CloudGuardDataImporter",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "lint": "npx eslint **/*.js --ignore-pattern node_modules/",
+    "lint:fix": "npm run lint -- --fix",
+    "prettier": "npx prettier '{*.js,!(node*)**/*.js}' --check",
+    "prettier:fix": "npm run prettier -- --write",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "unoah",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "aws-sdk": "^2.1178.0",
+    "axios": "^0.27.2",
+    "joi": "^17.6.0",
+    "moment": "^2.29.4"
+  },
+  "devDependencies": {
+    "eslint": "^8.19.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.7.1"
+  }
+}
