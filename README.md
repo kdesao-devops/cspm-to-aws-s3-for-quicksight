@@ -1,5 +1,5 @@
 # cspm-to-aws-s3-for-quicksight
-This is a data transfer out of CheckPoint CSPM over to AWS S3 for display as time series data in Quicksight. At a high level, the solution comprises multiple Lambda functions that perform the following:
+Transfers data out of CheckPoint CSPM over to AWS S3 for display as time series data in Quicksight. At a high level, the solution comprises multiple Lambda functions that perform the following:
 
 1. Obtain all AWS ECF asset data in CloudGuard CSPM via API calls to the endpoint: `https://api.cace1.dome9.com/v2/protected-asset/search`
 2. Save obtained (raw) data in an S3 bucket
