@@ -17,7 +17,22 @@ provider "aws" {
   region = var.aws_region
 }
 
-data "aws_caller_identity" "current" {}
+provider "aws" {
+  alias = "management"
+  region     = var.aws_region
+  access_key = var.AWS_MANAG_ACCESS_KEY_ID
+  secret_key = var.AWS_MANAG_SECRET_ACCESS_KEY
+  token = var.AWS_MANAG_SESSION_TOKEN
+}
+
+data "aws_caller_identity" "current" {
+  provider = aws
+}
+
+data "aws_caller_identity" "manag" {
+  provider = aws.management
+}
+
 data "aws_region" "current" {}
 
 # SSM Parameter Store
@@ -41,6 +56,7 @@ resource "aws_s3_bucket" "cloudguard_dashboard_data_bucket" {
   force_destroy = false
 }
 
+# Additionnal right for the lambda exuction
 resource "aws_iam_policy" "cloudguard_dashboard_lambda_policies" {
   name = "CloudGuardDashboardLambdaPermissions"
   policy = jsonencode({
@@ -224,21 +240,77 @@ resource "aws_s3_bucket_object" "cloudguard_data_transformer" {
   etag = filemd5(data.archive_file.data_transformer_lambda.output_path)
 }
 
+# Role needed to query account in the org. Resides on the master account
+resource "aws_iam_role" "query_org_accounts" {
+  provider = aws.management
+  name = "CSPM-transformation-Lambda-Query-Org-Accounts"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = "sts:AssumeRole",
+        Principal = {
+          Service = [
+            "organizations.amazonaws.com"
+          ]
+        }
+      },
+      {
+        Effect = "Allow",
+        Action = "sts:AssumeRole",
+        Principal = {
+          AWS = "${resource.aws_iam_role.data_transformer_lambda_exec_role.arn}"
+        }
+      }
+    ]
+  })
+}
+
+# Attached AWS managed AWSOrganizationsReadOnlyAccess policy to the Query Org Accounts Role
+resource "aws_iam_role_policy_attachment" "query_org_accounts_access" {
+  provider = aws.management
+  role       = aws_iam_role.query_org_accounts.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess"
+}
+
 # CloudGuardDataTransformer Lambda role
 resource "aws_iam_role" "data_transformer_lambda_exec_role" {
   name = "CloudGuardDataTransformerExecutionRole"
 
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = "sts:AssumeRole"
-      Sid    = ""
-      Principal = {
-        Service = "lambda.amazonaws.com"
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = "sts:AssumeRole",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
       }
-    }]
+    ]
   })
+}
+
+# Assume role right for the org list account
+resource "aws_iam_policy" "cloudguard_dashboard_data_transformer_policies" {
+  name = "CloudGuardDataTransformerAssumeRole"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+          "Effect": "Allow",
+          "Action": "sts:AssumeRole",
+          "Resource": "${resource.aws_iam_role.query_org_accounts.arn}"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "data_transformer_lambda_assumerole" {
+  role       = aws_iam_role.data_transformer_lambda_exec_role.name
+  policy_arn = aws_iam_policy.cloudguard_dashboard_data_transformer_policies.arn
 }
 
 # Attach policies
@@ -273,6 +345,7 @@ resource "aws_lambda_function" "data_transformer_lambda" {
   environment {
     variables = {
       "CLOUDGUARD_DATA_S3_BUCKET_ID" = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+      "ASSUMED_ROLE_ARN" = resource.aws_iam_role.query_org_accounts.arn
     }
   }
 
