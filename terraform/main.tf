@@ -201,13 +201,13 @@ resource "aws_lambda_permission" "data_importer_allow_execution_from_cloudwatch"
 }
 
 resource "aws_cloudwatch_event_rule" "cloudguard_dashboard_eventbridge" {
-  name                = "CloudGuard-Dashboard"
+  name                = "CloudGuard-Dashboard-data-import"
   description         = "Query CloudGuard API. Used to trigger the CloudGuard-Dashboard Lambda"
   schedule_expression = "cron(0 19 * * ? *)"
-  is_enabled          = false
+  is_enabled          = true
 }
 
-resource "aws_cloudwatch_event_target" "cloudguard_dashboard_eventbridge_target" {
+resource "aws_cloudwatch_event_target" "cloudguard_dashboard_import_eventbridge_target" {
   arn  = aws_lambda_function.data_importer_lambda.arn
   rule = aws_cloudwatch_event_rule.cloudguard_dashboard_eventbridge.name
 }
@@ -242,6 +242,50 @@ resource "aws_s3_bucket_object" "cloudguard_data_transformer" {
   source = data.archive_file.data_transformer_lambda.output_path
 
   etag = filemd5(data.archive_file.data_transformer_lambda.output_path)
+}
+
+# Cloudwatch event rule config
+resource "aws_cloudwatch_event_rule" "new_s3_file" {
+  name        = "CloudGuard-Dashboard-data-transformer"
+  description = "Capture new import lambda assets file upload"
+  is_enabled  = true
+
+
+  event_pattern = <<EOF
+{
+    "source": ["aws.s3"],
+    "detail-type": ["AWS API Call via CloudTrail"],
+    "detail": {
+        "eventSource": ["s3.amazonaws.com"],
+        "eventName": ["CopyObject","CompleteMultipartUpload","PutObject"],
+        "requestParameters": {
+            "bucketName": ["${resource.aws_s3_bucket.cloudguard_dashboard_data_bucket.id}"],
+            "key": [{ "prefix": "rawData/" }]
+        }
+    }
+}
+EOF
+}
+
+resource "aws_lambda_permission" "data_transformer_allow_execution_from_cloudwatch" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.data_transformer_lambda.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.new_s3_file.arn
+}
+
+resource "aws_cloudwatch_event_target" "cloudguard_dashboard_transformer_eventbridge_target" {
+  target_id = "bugedcoldstart"
+  arn       = aws_lambda_function.data_transformer_lambda.arn
+  rule      = aws_cloudwatch_event_rule.new_s3_file.name
+}
+
+# This one debug coldstart
+resource "aws_cloudwatch_event_target" "cloudguard_dashboard_transformer_eventbridge_target2" {
+  target_id = "debugcoldstart"
+  arn       = aws_lambda_function.data_transformer_lambda.arn
+  rule      = aws_cloudwatch_event_rule.new_s3_file.name
 }
 
 # Role needed to query account in the org. Resides on the master account
@@ -341,10 +385,11 @@ resource "aws_lambda_function" "data_transformer_lambda" {
   s3_bucket = aws_s3_bucket.cloudguard_dashboard_lambda_bucket.id
   s3_key    = aws_s3_bucket_object.cloudguard_data_transformer.key
 
-  runtime     = "nodejs14.x"
-  handler     = "src/index.index"
-  timeout     = 180
-  memory_size = 512
+  runtime                        = "nodejs14.x"
+  handler                        = "src/index.index"
+  timeout                        = 180
+  memory_size                    = 512
+  reserved_concurrent_executions = 1 ## This is because of the cold start bug, It allows the double call to "pre-heat the lambda" 
 
   environment {
     variables = {
