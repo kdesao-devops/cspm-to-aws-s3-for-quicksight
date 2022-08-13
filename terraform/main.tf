@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 3.48.0"
+      version = "~> 4.24.0"
     }
     archive = {
       source  = "hashicorp/archive"
@@ -400,4 +400,100 @@ resource "aws_lambda_function" "data_transformer_lambda" {
 
   source_code_hash = data.archive_file.data_transformer_lambda.output_base64sha256
   role             = aws_iam_role.data_transformer_lambda_exec_role.arn
+}
+
+##############
+# Quicksight #
+##############
+
+# Upload Manifest of quicksight configuration file im s3
+resource "aws_s3_bucket_object" "manifest_upload" {
+  bucket = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+  key    = "manifest.json"
+  acl    = "private" # or can be "public-read"
+  source = "resources/manifest.json"
+  etag   = filemd5("resources/manifest.json")
+
+}
+
+# This fails on first run, second one works, dependency didn't solve the issue
+# After the first run, the resource is created nut doesn't appear on Quicksight
+# resource "aws_quicksight_data_source" "default" {
+#   data_source_id = "CSPM-Dashboard"
+#   name           = "CSPM Assets list by type and account"
+
+#   depends_on = [aws_iam_role_policy_attachment.Cloudguard_quicksight_s3_access_rights]
+
+#   parameters {
+#     s3 {
+#       manifest_file_location {
+#         bucket = resource.aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+#         key    = resource.aws_s3_bucket_object.manifest_upload.id
+#       }
+#     }
+#   }
+#   type = "S3"
+# }
+
+# Quicksight execution role
+resource "aws_iam_role" "quicksight_service_role" {
+  name = "CloudGuardQuicksightserviceRole"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = "sts:AssumeRole"
+        Principal = {
+          Service = "quicksight.amazonaws.com"
+        },
+      }
+    ]
+  })
+}
+
+# s3 access right for Quicksight
+resource "aws_iam_policy" "cloudguard_quicksight_s3_policy" {
+  name = "CloudGuardQuicksightS3Policy"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow",
+        Action   = "s3:ListAllMyBuckets",
+        Resource = "arn:aws:s3:::*"
+      },
+      {
+        Action = [
+          "s3:ListBucket"
+        ],
+        Effect = "Allow",
+        Resource = [
+          "${resource.aws_s3_bucket.cloudguard_dashboard_data_bucket.arn}"
+        ]
+      },
+      {
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion"
+        ],
+        Effect = "Allow",
+        Resource = [
+          "${resource.aws_s3_bucket.cloudguard_dashboard_data_bucket.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+#Policy attachment
+resource "aws_iam_role_policy_attachment" "Cloudguard_quicksight_default_access_rights" {
+  role       = aws_iam_role.quicksight_service_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSQuicksightAthenaAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "Cloudguard_quicksight_s3_access_rights" {
+  role       = aws_iam_role.quicksight_service_role.name
+  policy_arn = resource.aws_iam_policy.cloudguard_quicksight_s3_policy.arn
 }
