@@ -4,7 +4,7 @@ const { createWriteStream } = require("node:fs");
 const moment = require("moment");
 
 module.exports.index = async () => {
-  const dateTimeObject = new moment().format("YYYY-MMMM-DD-hhmmss");
+  const dateTimeObject = new moment().format("YYYY-MMMM-DD");
 
   const fileName = `cloud-guard-protected-assets-${dateTimeObject}.json`;
   const filePath = "/tmp/" + fileName
