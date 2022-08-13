@@ -1,0 +1,14 @@
+{
+    "fileLocations": [
+        {
+            "URIPrefixes": [
+                "s3://cloudguard-dashboard-data-051190059498-ca-central-1/processedData/"
+            ]
+        }
+    ],
+    "globalUploadSettings": {
+        "format": "CSV",
+        "delimiter": ",",
+        "containsHeader": "true"
+    }
+}
