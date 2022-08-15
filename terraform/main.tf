@@ -184,6 +184,7 @@ resource "aws_lambda_function" "data_importer_lambda" {
       "CLOUDGUARD_API_KEYS_PARAMETER_STORE" = aws_ssm_parameter.cloudguard_api_keys.name
       "CLOUDGUARD_PAGE_SIZE"                = var.cloudguard_api_page_size
       "CLOUDGUARD_DATA_S3_BUCKET_ID"        = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+      "AWS_API_REGION"                      = var.aws_region
     }
   }
 
@@ -407,14 +408,14 @@ resource "aws_lambda_function" "data_transformer_lambda" {
 ##############
 
 # Upload Manifest of quicksight configuration file im s3
-resource "aws_s3_bucket_object" "manifest_upload" {
-  bucket = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
-  key    = "manifest.json"
-  acl    = "private" # or can be "public-read"
-  source = "resources/manifest.json"
-  etag   = filemd5("resources/manifest.json")
+# resource "aws_s3_bucket_object" "manifest_upload" {
+#   bucket = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+#   key    = "manifest.json"
+#   acl    = "private" # or can be "public-read"
+#   source = "resources/manifest.json"
+#   etag   = filemd5("resources/manifest.json")
 
-}
+# }
 
 # This fails on first run, second one works, dependency didn't solve the issue
 # After the first run, the resource is created nut doesn't appear on Quicksight

@@ -10,7 +10,7 @@ const getProtectedAssets = async (searchAfter = [], pageSize = 1000) => {
 
   const ssmClient = new awsClient.SSM({
     apiVersion: "2014-11-06",
-    region: "ca-central-1",
+    region: process.env.AWS_API_REGION,
   });
 
   let cloudGuardApiKeys = {};
