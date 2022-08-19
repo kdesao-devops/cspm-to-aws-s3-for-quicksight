@@ -2,7 +2,7 @@
     "fileLocations": [
         {
             "URIPrefixes": [
-                "s3://cloudguard-dashboard-data-051190059498-ca-central-1/processedData/"
+                "s3://cloudguard-dashboard-data-${account_id}-${region}/processedData/"
             ]
         }
     ],

@@ -407,34 +407,45 @@ resource "aws_lambda_function" "data_transformer_lambda" {
 # Quicksight #
 ##############
 
-# Upload Manifest of quicksight configuration file im s3
-# resource "aws_s3_bucket_object" "manifest_upload" {
-#   bucket = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
-#   key    = "manifest.json"
-#   acl    = "private" # or can be "public-read"
-#   source = "resources/manifest.json"
-#   etag   = filemd5("resources/manifest.json")
+# Upload quicksight configuration manifest in s3
+resource "aws_s3_bucket_object" "manifest_upload" {
+  bucket  = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+  key     = "manifest.json"
+  acl     = "private"
+  content = templatefile("resources/manifest.json", { account_id = data.aws_caller_identity.current.id, region = var.aws_region })
+  etag    = filemd5("resources/manifest.json")
+}
 
-# }
+# This is a placeholder to be replaced once we will have the full IAM config so we can use groups. 
+# Get the user arn that created the Quicksight to give him the right to see the created DataSource.
+data "external" "policy_document" {
+  program = ["bash", "${path.module}/resources/GetQuicksightUserArn.sh", var.aws_region, data.aws_caller_identity.current.id]
+}
 
-# This fails on first run, second one works, dependency didn't solve the issue
-# After the first run, the resource is created nut doesn't appear on Quicksight
-# resource "aws_quicksight_data_source" "default" {
-#   data_source_id = "CSPM-Dashboard"
-#   name           = "CSPM Assets list by type and account"
+# Creating the DataSource
+resource "aws_quicksight_data_source" "default" {
+  data_source_id = "CSPM-Dashboard"
+  name           = "CSPM Assets list by type and account"
+  type           = "S3"
 
-#   depends_on = [aws_iam_role_policy_attachment.Cloudguard_quicksight_s3_access_rights]
+  parameters {
+    s3 {
+      manifest_file_location {
+        bucket = resource.aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+        key    = resource.aws_s3_bucket_object.manifest_upload.id
+      }
+    }
+  }
 
-#   parameters {
-#     s3 {
-#       manifest_file_location {
-#         bucket = resource.aws_s3_bucket.cloudguard_dashboard_data_bucket.id
-#         key    = resource.aws_s3_bucket_object.manifest_upload.id
-#       }
-#     }
-#   }
-#   type = "S3"
-# }
+  permission {
+    actions = [
+      "quicksight:DescribeDataSource",
+      "quicksight:DescribeDataSourcePermissions",
+      "quicksight:PassDataSource",
+    ]
+    principal = data.external.policy_document.result.arn
+  }
+}
 
 # Quicksight execution role
 resource "aws_iam_role" "quicksight_service_role" {
