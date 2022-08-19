@@ -38,7 +38,7 @@ variable "cloudguard_api_page_size" {
 
 # Values for SSM Parameter Store
 variable "cloudguard_api_keys_parameter" {
-  description = "CloudGuard API Keys"
+  description = "CloudGuard API Keys. Environment variable syntax: export TF_VAR_cloudguard_api_keys_parameter=secret"
 
   type = string
 }
