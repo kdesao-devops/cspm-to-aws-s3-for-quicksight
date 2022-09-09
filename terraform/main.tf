@@ -282,13 +282,6 @@ resource "aws_cloudwatch_event_target" "cloudguard_dashboard_transformer_eventbr
   rule      = aws_cloudwatch_event_rule.new_s3_file.name
 }
 
-# This one debug coldstart
-resource "aws_cloudwatch_event_target" "cloudguard_dashboard_transformer_eventbridge_target2" {
-  target_id = "debugcoldstart"
-  arn       = aws_lambda_function.data_transformer_lambda.arn
-  rule      = aws_cloudwatch_event_rule.new_s3_file.name
-}
-
 # Role needed to query account in the org. Resides on the master account
 resource "aws_iam_role" "query_org_accounts" {
   provider = aws.management

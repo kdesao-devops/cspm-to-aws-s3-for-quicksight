@@ -19,6 +19,10 @@ const dataflat = function (listunflat) {
   return data_flat.flat();
 };
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 module.exports.index = function () {
   const readfileName = `cloud-guard-protected-assets-${dateTimeObject}.json`;
   const readfilePath = "rawData/" + readfileName;
@@ -70,34 +74,35 @@ module.exports.index = function () {
     });
   })
 
-
   getStream().on('end', function () {
     // Writing the csv file locally
-    const fileName = `cloud-guard-assets-${dateTimeObject}.csv`;
-    const filePath = "/tmp/" + fileName
+    sleep(50000).then(() => {
+      const fileName = `cloud-guard-assets-${dateTimeObject}.csv`;
+      const filePath = "/tmp/" + fileName
 
-    const createCsvWriter = csvwriter.createObjectCsvWriter;
-    const csvWriter = createCsvWriter({
-      path: filePath,
-      header: [
-        { id: 'date', title: 'Date' },
-        { id: 'account_id', title: 'Account ID' },
-        { id: 'type', title: 'Type' },
-        { id: 'quantity', title: 'Quantity' },
-        { id: 'Account_name', title: 'Account Name' },
-      ]
-    });
+      const createCsvWriter = csvwriter.createObjectCsvWriter;
+      const csvWriter = createCsvWriter({
+        path: filePath,
+        header: [
+          { id: 'date', title: 'Date' },
+          { id: 'account_id', title: 'Account ID' },
+          { id: 'type', title: 'Type' },
+          { id: 'quantity', title: 'Quantity' },
+          { id: 'Account_name', title: 'Account Name' },
+        ]
+      });
 
-    const assets_list = dataflat(result)
+      const assets_list = dataflat(result)
 
-    csvWriter.writeRecords(assets_list).then(() => {
-      try {
-        uploadDataToS3(fileName).then((response) => {
-          console.log('done');
-        });
-      } catch (err) {
-        console.log(err);
-      }
+      csvWriter.writeRecords(assets_list).then(() => {
+        try {
+          uploadDataToS3(fileName).then((response) => {
+            console.log('done');
+          });
+        } catch (err) {
+          console.log(err);
+        }
+      });
     });
   });
 };

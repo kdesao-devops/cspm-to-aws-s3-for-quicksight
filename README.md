@@ -44,3 +44,22 @@ Please follow this procedure for *new account deployement* until a better integr
     Also, you need to add the shceduled refresh for Quicksight to import the new data everyday.
 
 
+## Please note
+The CSPM API provide a greater list of assets than the Web UI. A filter has been created in Quicksight to render the same view.
+
+Here is the list of assets not refderenced in CSPM:
+- IAM policy
+- Subnet
+- Security group
+- NACL
+- event rule
+- IAM Account summary 
+- VPC flowlog 
+- metric alarm 
+- ?? Internet Gateway
+- EIP 
+- AMI
+- sns subscription
+- auto scaling group
+- elastic cache
+- VPC Peering connection
