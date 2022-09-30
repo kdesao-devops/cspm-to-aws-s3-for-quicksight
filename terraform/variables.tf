@@ -42,3 +42,7 @@ variable "cloudguard_api_keys_parameter" {
 
   type = string
 }
+variable "lz_portal_cloudfront_url" {
+  default     = "https://d1fzcbmgrabtnu.cloudfront.net/test"
+  description = "Url of the lz identification app Cloudfront distribution. Temporary until we use the overlay repository"
+}

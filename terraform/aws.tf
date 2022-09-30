@@ -1,19 +1,4 @@
-# Global Configuration
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 4.24.0"
-    }
-    archive = {
-      source  = "hashicorp/archive"
-      version = "~> 2.2.0"
-    }
-  }
-
-  required_version = "~> 1.0"
-}
-
+# Providers
 provider "aws" {
   region = var.aws_region
 }
@@ -501,4 +486,170 @@ resource "aws_iam_role_policy_attachment" "Cloudguard_quicksight_default_access_
 resource "aws_iam_role_policy_attachment" "Cloudguard_quicksight_s3_access_rights" {
   role       = aws_iam_role.quicksight_service_role.name
   policy_arn = resource.aws_iam_policy.cloudguard_quicksight_s3_policy.arn
+}
+
+################
+## SSO Config ##
+################
+
+# Quicksight reader access role
+resource "aws_iam_role" "quicksight_reader_role" {
+  name                 = "BCGOV_CORE_Quicksight_reader"
+  max_session_duration = 21600
+
+  assume_role_policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-tmhl5tvs"
+            },
+            "Action": "sts:AssumeRoleWithSAML",
+            "Condition": {
+                "StringEquals": {
+                    "SAML:aud": [
+                        "https://signin.aws.amazon.com/saml",
+                        "${var.lz_portal_cloudfront_url}"
+                    ]
+                }
+            }
+        }
+    ]
+}
+EOF
+}
+
+# Quicksight author access role
+resource "aws_iam_role" "quicksight_author_role" {
+  name                 = "BCGOV_CORE_Quicksight_author"
+  max_session_duration = 21600
+
+  assume_role_policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-tmhl5tvs"
+            },
+            "Action": "sts:AssumeRoleWithSAML",
+            "Condition": {
+                "StringEquals": {
+                    "SAML:aud": [
+                        "https://signin.aws.amazon.com/saml",
+                        "${var.lz_portal_cloudfront_url}"
+                    ]
+                }
+            }
+        }
+    ]
+}
+EOF
+}
+
+resource "aws_iam_role" "quicksight_admin_role" {
+  name                 = "BCGOV_CORE_Quicksight_admin"
+  max_session_duration = 21600
+
+  assume_role_policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-tmhl5tvs"
+            },
+            "Action": "sts:AssumeRoleWithSAML",
+            "Condition": {
+                "StringEquals": {
+                    "SAML:aud": [
+                        "https://signin.aws.amazon.com/saml",
+                        "${var.lz_portal_cloudfront_url}"
+                    ]
+                }
+            }
+        }
+    ]
+}
+EOF
+}
+
+# Quicksight reader access policy
+resource "aws_iam_policy" "quicksight_reader_access_policy" {
+  name = "QuicksightReaderAccess"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow",
+        Resource = "*",
+        Action = [
+          "quicksight:DescribeDashboard",
+          "quicksight:ListAnalyses",
+          "quicksight:ListDashboards",
+          "quicksight:CreateReader",
+          "quicksight:SearchDashboards",
+          "quicksight:DescribeUser",
+          "quicksight:SearchAnalyses"
+        ]
+      }
+    ]
+  })
+}
+
+# Quicksight author access policy
+resource "aws_iam_policy" "quicksight_author_access_policy" {
+  name = "QuicksightAuthorAccess"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow",
+        Resource = "*",
+        Action = [
+          "quicksight:DescribeDashboard",
+          "quicksight:ListAnalyses",
+          "quicksight:ListDashboards",
+          "quicksight:CreateUser",
+          "quicksight:SearchDashboards",
+          "quicksight:DescribeUser",
+          "quicksight:SearchAnalyses"
+        ]
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "quicksight_admin_access_policy" {
+  name = "QuicksightAdminAccess"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow",
+        Resource = "*",
+        Action   = "quicksight:*"
+      }
+    ]
+  })
+}
+
+# Quicksight access Policies attachment
+resource "aws_iam_role_policy_attachment" "quicksight_reader_access" {
+  role       = aws_iam_role.quicksight_reader_role.name
+  policy_arn = aws_iam_policy.quicksight_reader_access_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "quicksight_author_access" {
+  role       = aws_iam_role.quicksight_author_role.name
+  policy_arn = aws_iam_policy.quicksight_author_access_policy.arn
+}
+
+resource "aws_iam_role_policy_attachment" "quicksight_admin_access" {
+  role       = aws_iam_role.quicksight_author_role.name
+  policy_arn = aws_iam_policy.quicksight_admin_access_policy.arn
 }
