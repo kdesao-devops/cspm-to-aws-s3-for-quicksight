@@ -653,3 +653,71 @@ resource "aws_iam_role_policy_attachment" "quicksight_admin_access" {
   role       = aws_iam_role.quicksight_author_role.name
   policy_arn = aws_iam_policy.quicksight_admin_access_policy.arn
 }
+
+# Quicksight users creation
+
+resource "aws_quicksight_user" "readers" {
+  for_each      = toset(var.reader_list)
+  session_name  = each.key
+  email         = data.keycloak_user.this[each.key].email
+  namespace     = "default"
+  identity_type = "IAM"
+  iam_arn       = aws_iam_role.quicksight_reader_role.arn
+  user_role     = "READER"
+}
+
+resource "aws_quicksight_user" "authors" {
+  for_each      = toset(var.author_list)
+  session_name  = each.key
+  email         = data.keycloak_user.this[each.key].email
+  namespace     = "default"
+  identity_type = "IAM"
+  iam_arn       = aws_iam_role.quicksight_author_role.arn
+  user_role     = "AUTHOR"
+}
+
+resource "aws_quicksight_user" "admin" {
+  for_each      = toset(var.admin_list)
+  session_name  = each.key
+  email         = data.keycloak_user.this[each.key].email
+  namespace     = "default"
+  identity_type = "IAM"
+  iam_arn       = aws_iam_role.quicksight_admin_role.arn
+  user_role     = "ADMIN"
+}
+
+# Quicksight groups creation
+resource "aws_quicksight_group" "readers" {
+  group_name = "readers"
+  description = "This group for the reader is not really used because user can directly access the public CSPM Dashboard"
+}
+
+resource "aws_quicksight_group" "author" {
+  group_name = "authors"
+  description = "Group link with the CSPM Dashboard; need to be linked on the first execution"
+}
+
+resource "aws_quicksight_group" "admin" {
+  group_name = "admins"
+  description = "Group link with the CSPM Dashboard; need to be linked on the first execution"
+}
+
+# Quicksight user group maping
+
+resource "aws_quicksight_group_membership" "readers" {
+  for_each    = toset(var.reader_list)
+  group_name  = "readers"
+  member_name = "${aws_iam_role.quicksight_reader_role.arn}/${each.key}"
+}
+
+resource "aws_quicksight_group_membership" "authors" {
+  for_each    = toset(var.author_list)
+  group_name  = "authors"
+  member_name = "${aws_iam_role.quicksight_author_role.name}/${each.key}"
+}
+
+resource "aws_quicksight_group_membership" "admins" {
+  for_each    = toset(var.admin_list)
+  group_name  = "admins"
+  member_name = "${aws_iam_role.quicksight_admin_role.arn}/${each.key}"
+}
