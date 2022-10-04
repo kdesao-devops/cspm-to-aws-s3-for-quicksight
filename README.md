@@ -6,10 +6,17 @@ Those Dashboards offer a time series view using AWS Quicksight.
 
 ## architecture
 It deploys:
-- S3 Bucket for the data
-- Importation Lambda
-- Transformation Lambda
-- Quicksight data source and IAM config
+- AWS
+- - S3 Bucket for the data
+- - Importation Lambda
+- - Transformation Lambda
+- - Quicksight data source
+- - Quicksight user management
+- - Quicksight groups management  
+
+- Keycloack
+- - Create the client roles for AWS
+- - groups management
 
 ![](Cloudguard-Dashboard-arch.png)
 
@@ -43,6 +50,7 @@ Please follow this procedure for *new account deployement* until a better integr
     Attention: Change the type of account id, Indeed the account id is labelled as a integer but it's a string. You need to change it on the data prview.  
     Also, you need to add the shceduled refresh for Quicksight to import the new data everyday.
 
+    6. **BEWARE** On the first execution the Dashboard must be link with the Authors and Admins groups. <Dashboard> -> <Share> -> <select "authors" and "admin">
 
 ## Please note
 The CSPM API provide a greater list of assets than the Web UI. A filter has been created in Quicksight to render the same view.
