@@ -504,7 +504,7 @@ resource "aws_iam_role" "quicksight_reader_role" {
         {
             "Effect": "Allow",
             "Principal": {
-                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-tmhl5tvs"
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
             },
             "Action": "sts:AssumeRoleWithSAML",
             "Condition": {
@@ -533,7 +533,7 @@ resource "aws_iam_role" "quicksight_author_role" {
         {
             "Effect": "Allow",
             "Principal": {
-                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-tmhl5tvs"
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
             },
             "Action": "sts:AssumeRoleWithSAML",
             "Condition": {
@@ -561,7 +561,7 @@ resource "aws_iam_role" "quicksight_admin_role" {
         {
             "Effect": "Allow",
             "Principal": {
-                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-tmhl5tvs"
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
             },
             "Action": "sts:AssumeRoleWithSAML",
             "Condition": {
@@ -650,7 +650,7 @@ resource "aws_iam_role_policy_attachment" "quicksight_author_access" {
 }
 
 resource "aws_iam_role_policy_attachment" "quicksight_admin_access" {
-  role       = aws_iam_role.quicksight_author_role.name
+  role       = aws_iam_role.quicksight_admin_role.name
   policy_arn = aws_iam_policy.quicksight_admin_access_policy.arn
 }
 
@@ -676,7 +676,7 @@ resource "aws_quicksight_user" "authors" {
   user_role     = "AUTHOR"
 }
 
-resource "aws_quicksight_user" "admin" {
+resource "aws_quicksight_user" "admins" {
   for_each      = toset(var.admin_list)
   session_name  = each.key
   email         = data.keycloak_user.this[each.key].email
@@ -687,7 +687,7 @@ resource "aws_quicksight_user" "admin" {
 }
 
 # Quicksight groups creation
-resource "aws_quicksight_group" "readers" {
+resource "aws_quicksight_group" "reader" {
   group_name = "readers"
   description = "This group for the reader is not really used because user can directly access the public CSPM Dashboard"
 }
@@ -707,17 +707,32 @@ resource "aws_quicksight_group" "admin" {
 resource "aws_quicksight_group_membership" "readers" {
   for_each    = toset(var.reader_list)
   group_name  = "readers"
-  member_name = "${aws_iam_role.quicksight_reader_role.arn}/${each.key}"
+  member_name = "${aws_iam_role.quicksight_reader_role.name}/${each.key}"
+
+  depends_on = [
+    aws_quicksight_user.readers,
+    aws_quicksight_group.reader
+  ]
 }
 
 resource "aws_quicksight_group_membership" "authors" {
   for_each    = toset(var.author_list)
   group_name  = "authors"
   member_name = "${aws_iam_role.quicksight_author_role.name}/${each.key}"
+
+  depends_on = [
+    aws_quicksight_user.authors,
+    aws_quicksight_group.author
+  ]
 }
 
 resource "aws_quicksight_group_membership" "admins" {
   for_each    = toset(var.admin_list)
   group_name  = "admins"
-  member_name = "${aws_iam_role.quicksight_admin_role.arn}/${each.key}"
+  member_name = "${aws_iam_role.quicksight_admin_role.name}/${each.key}"
+
+  depends_on = [
+    aws_quicksight_user.admins,
+    aws_quicksight_group.admin
+  ]
 }

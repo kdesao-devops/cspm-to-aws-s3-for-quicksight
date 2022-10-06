@@ -49,28 +49,23 @@ variable "cloudguard_api_keys_parameter" {
 
 # Keycloak provider configuration
 variable "kc_base_url" {
-  default     = "https://dev.oidc.gov.bc.ca"
   description = "Base URL for Keycloak"
 }
 
 variable "kc_realm" {
-  default     = "tmhl5tvs"
   description = "realm name for Keycloak"
 }
 
 variable "kc_terraform_auth_client_id" {
-  default     = "terraform"
   description = "Keycloal progamatic user name"
 }
 
 variable "kc_openid_client_id" {
-  default     = "urn:amazon:webservices"
   description = "Client ID of the AWS provider in Keycloak (This isn't the same as the uniaue client-id that's why we use the data block)"
 }
 
 
 variable "lz_portal_cloudfront_url" {
-  default     = "https://d1fzcbmgrabtnu.cloudfront.net/test"
   description = "Url of the lz identification app Cloudfront distribution. Temporary until we use the overlay repository"
 }
 
@@ -82,13 +77,13 @@ variable "reader_list" {
 }
 
 variable "author_list" {
-  default     = []
+  default     = ["wenhli@idir"]
   description = "List of user allowed to create a Author user on Quicksight"
   type        = list(string)
 }
 
 variable "admin_list" {
-  default     = []
+  default     = ["jsubda@idir"]
   description = "List of user allowed to create a Admin user on Quicksight"
   type        = list(string)
 }
