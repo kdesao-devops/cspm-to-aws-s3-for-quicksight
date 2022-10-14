@@ -71,7 +71,7 @@ variable "lz_portal_cloudfront_url" {
 
 # User right management
 variable "reader_list" {
-  default     = ["jmccaig@idir","wuniewsk@idir"]
+  default     = ["jmccaig@idir","wuniewsk@idir","catliu@idir","gheshmat@idir"]
   description = "List of user allowed to create a Reader user on Quicksight"
   type        = list(string)
 }
