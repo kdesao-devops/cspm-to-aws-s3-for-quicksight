@@ -394,12 +394,6 @@ resource "aws_s3_bucket_object" "manifest_upload" {
   etag    = filemd5("resources/manifest.json")
 }
 
-# This is a placeholder to be replaced once we will have the full IAM config so we can use groups. 
-# Get the user arn that created the Quicksight to give him the right to see the created DataSource.
-data "external" "policy_document" {
-  program = ["bash", "${path.module}/resources/GetQuicksightUserArn.sh", var.aws_region, data.aws_caller_identity.current.id]
-}
-
 # Creating the DataSource
 resource "aws_quicksight_data_source" "default" {
   data_source_id = "CSPM-Dashboard"
@@ -421,7 +415,7 @@ resource "aws_quicksight_data_source" "default" {
       "quicksight:DescribeDataSourcePermissions",
       "quicksight:PassDataSource",
     ]
-    principal = data.external.policy_document.result.arn
+    principal = "arn:aws:quicksight:ca-central-1:${data.aws_caller_identity.current.id}:user/default/BCGOV_CORE_Quicksight_admin/${var.admin_list[0]}"
   }
 }
 
