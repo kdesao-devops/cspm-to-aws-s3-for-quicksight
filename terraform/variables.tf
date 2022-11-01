@@ -5,22 +5,6 @@ variable "aws_region" {
   default = "ca-central-1"
 }
 
-# Management account access variable
-variable "AWS_MANAG_ACCESS_KEY_ID" {
-  description = "(Management account key ID. Environment variable syntax: export TF_VAR_AWS_MANAG_ACCESS_KEY_ID=secret)"
-  type        = string
-}
-
-variable "AWS_MANAG_SECRET_ACCESS_KEY" {
-  description = "(Management account access key. Environment variable syntax: export TF_VAR_AWS_MANAG_SECRET_ACCESS_KEY=secret)"
-  type        = string
-}
-
-variable "AWS_MANAG_SESSION_TOKEN" {
-  description = "(Management account token. Environment variable syntax: export TF_VAR_AWS_MANAG_SESSION_TOKEN=secret)"
-  type        = string
-}
-
 # Lambda Environment Variables
 variable "cloudguard_api_endpoint" {
   description = "CloudGuard API Endpoint"
@@ -36,36 +20,40 @@ variable "cloudguard_api_page_size" {
   default = 1000
 }
 
-# Values for SSM Parameter Store
-variable "cloudguard_api_keys_parameter" {
-  description = "CloudGuard API Keys. Environment variable syntax: export TF_VAR_cloudguard_api_keys_parameter=secret"
-
+variable "cloud_guard_api_key_parameter_store_name" {
+  description = "Name of the pre-created SSM Parameter containing the CloudGuard API Keys for the data_importer_lambda"
   type = string
+
+  default = "/cloudguard_dashboard/cloudguard_api_keys"
 }
 
 ################
 ## SSO Config ##
 ################
-
 # Keycloak provider configuration
 variable "kc_base_url" {
+  default     = "https://oidc.gov.bc.ca/auth"
   description = "Base URL for Keycloak"
 }
 
 variable "kc_realm" {
+  default     = "umafubc9"
   description = "realm name for Keycloak"
 }
 
 variable "kc_terraform_auth_client_id" {
+  default     = "terraform"
   description = "Keycloal progamatic user name"
 }
 
 variable "kc_openid_client_id" {
+  default     = "urn:amazon:webservices"
   description = "Client ID of the AWS provider in Keycloak (This isn't the same as the uniaue client-id that's why we use the data block)"
 }
 
 
 variable "lz_portal_cloudfront_url" {
+  default     = "https://d1kb6br25oqacj.cloudfront.net/test"
   description = "Url of the lz identification app Cloudfront distribution. Temporary until we use the overlay repository"
 }
 

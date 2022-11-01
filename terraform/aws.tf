@@ -1,3 +1,8 @@
+locals {
+  core_accounts      = { for account in module.lz_info.core_accounts : account.name => account }
+  operations_account = local.core_accounts["Operations"]
+}
+
 # Providers
 provider "aws" {
   region = var.aws_region
@@ -5,33 +10,36 @@ provider "aws" {
 
 # Account that has access to the organization root to get the account list
 provider "aws" {
-  alias      = "management"
-  region     = var.aws_region
-  access_key = var.AWS_MANAG_ACCESS_KEY_ID
-  secret_key = var.AWS_MANAG_SECRET_ACCESS_KEY
-  token      = var.AWS_MANAG_SESSION_TOKEN
+  alias  = "operation"
+  region = var.aws_region
+  assume_role {
+    role_arn     = "arn:aws:iam::${local.operations_account.id}:role/AWSCloudFormationStackSetExecutionRole"
+    session_name = "slz-terraform-automation"
+  }
 }
 
 # Data Gathering
+module "lz_info" {
+  source = "github.com/BCDevOps/terraform-aws-sea-organization-info"
+  providers = {
+    aws = aws
+  }
+}
+
+
 data "aws_caller_identity" "current" {
   provider = aws
 }
 
-data "aws_caller_identity" "manag" {
-  provider = aws.management
+data "aws_caller_identity" "operation" {
+  provider = aws.operation
 }
 
 data "aws_region" "current" {}
 
-# SSM Parameter Store
-resource "aws_ssm_parameter" "cloudguard_api_keys" {
-  name  = "/cloudguard_dashboard/cloudguard_api_keys"
-  type  = "SecureString"
-  value = var.cloudguard_api_keys_parameter
-}
-
 # S3 Bucket for Lambda asset
 resource "aws_s3_bucket" "cloudguard_dashboard_lambda_bucket" {
+  provider      = aws.operation
   bucket        = "cloudguard-dashboard-lambda-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
   acl           = "private"
   force_destroy = false
@@ -39,6 +47,7 @@ resource "aws_s3_bucket" "cloudguard_dashboard_lambda_bucket" {
 
 # S3 Bucket for storing CloudGuard data
 resource "aws_s3_bucket" "cloudguard_dashboard_data_bucket" {
+  provider      = aws.operation
   bucket        = "cloudguard-dashboard-data-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
   acl           = "private"
   force_destroy = false
@@ -46,7 +55,8 @@ resource "aws_s3_bucket" "cloudguard_dashboard_data_bucket" {
 
 # Additionnal right for the lambda exuction
 resource "aws_iam_policy" "cloudguard_dashboard_lambda_policies" {
-  name = "CloudGuardDashboardLambdaPermissions"
+  provider = aws.operation
+  name     = "CloudGuardDashboardLambdaPermissions"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -109,7 +119,8 @@ data "archive_file" "data_importer_lambda" {
 }
 
 resource "aws_s3_bucket_object" "cloudguard_data_importer" {
-  bucket = aws_s3_bucket.cloudguard_dashboard_lambda_bucket.id
+  provider = aws.operation
+  bucket   = aws_s3_bucket.cloudguard_dashboard_lambda_bucket.id
 
   key    = "cloudguard-data-importer-lambda.zip"
   source = data.archive_file.data_importer_lambda.output_path
@@ -119,7 +130,8 @@ resource "aws_s3_bucket_object" "cloudguard_data_importer" {
 
 # CloudGuardDataImporter Lambda role
 resource "aws_iam_role" "data_importer_lambda_exec_role" {
-  name = "CloudGuardDataImporterExecutionRole"
+  provider = aws.operation
+  name     = "CloudGuardDataImporterExecutionRole"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -136,22 +148,26 @@ resource "aws_iam_role" "data_importer_lambda_exec_role" {
 
 # Attach policies
 resource "aws_iam_role_policy_attachment" "data_importer_basic_execution_policy" {
+  provider   = aws.operation
   role       = aws_iam_role.data_importer_lambda_exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "data_importer_parameter_store_readonly_policy" {
+  provider   = aws.operation
   role       = aws_iam_role.data_importer_lambda_exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
 }
 
 # Attach the LambdaPermissions IAM policy to DataImporter Lambda Execution Role
 resource "aws_iam_role_policy_attachment" "data_importer_lambda_access" {
+  provider   = aws.operation
   role       = aws_iam_role.data_importer_lambda_exec_role.name
   policy_arn = aws_iam_policy.cloudguard_dashboard_lambda_policies.arn
 }
 
 resource "aws_lambda_function" "data_importer_lambda" {
+  provider      = aws.operation
   function_name = "CloudGuardDataImporter"
   description   = "Pull data from CheckPoint CloudGuard for presenting on a dashboard"
 
@@ -166,7 +182,7 @@ resource "aws_lambda_function" "data_importer_lambda" {
   environment {
     variables = {
       "CLOUDGUARD_API_ENDPOINT"             = var.cloudguard_api_endpoint
-      "CLOUDGUARD_API_KEYS_PARAMETER_STORE" = aws_ssm_parameter.cloudguard_api_keys.name
+      "CLOUDGUARD_API_KEYS_PARAMETER_STORE" = var.cloud_guard_api_key_parameter_store_name
       "CLOUDGUARD_PAGE_SIZE"                = var.cloudguard_api_page_size
       "CLOUDGUARD_DATA_S3_BUCKET_ID"        = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
       "AWS_API_REGION"                      = var.aws_region
@@ -179,6 +195,7 @@ resource "aws_lambda_function" "data_importer_lambda" {
 
 # CloudWatch
 resource "aws_lambda_permission" "data_importer_allow_execution_from_cloudwatch" {
+  provider      = aws.operation
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.data_importer_lambda.function_name
@@ -187,6 +204,7 @@ resource "aws_lambda_permission" "data_importer_allow_execution_from_cloudwatch"
 }
 
 resource "aws_cloudwatch_event_rule" "cloudguard_dashboard_eventbridge" {
+  provider            = aws.operation
   name                = "CloudGuard-Dashboard-data-import"
   description         = "Query CloudGuard API. Used to trigger the CloudGuard-Dashboard Lambda"
   schedule_expression = "cron(0 19 * * ? *)"
@@ -194,8 +212,9 @@ resource "aws_cloudwatch_event_rule" "cloudguard_dashboard_eventbridge" {
 }
 
 resource "aws_cloudwatch_event_target" "cloudguard_dashboard_import_eventbridge_target" {
-  arn  = aws_lambda_function.data_importer_lambda.arn
-  rule = aws_cloudwatch_event_rule.cloudguard_dashboard_eventbridge.name
+  provider = aws.operation
+  arn      = aws_lambda_function.data_importer_lambda.arn
+  rule     = aws_cloudwatch_event_rule.cloudguard_dashboard_eventbridge.name
 }
 
 #
@@ -222,7 +241,8 @@ data "archive_file" "data_transformer_lambda" {
 }
 
 resource "aws_s3_bucket_object" "cloudguard_data_transformer" {
-  bucket = aws_s3_bucket.cloudguard_dashboard_lambda_bucket.id
+  provider = aws.operation
+  bucket   = aws_s3_bucket.cloudguard_dashboard_lambda_bucket.id
 
   key    = "cloudguard-data-transformer-lambda.zip"
   source = data.archive_file.data_transformer_lambda.output_path
@@ -232,6 +252,7 @@ resource "aws_s3_bucket_object" "cloudguard_data_transformer" {
 
 # Cloudwatch event rule config
 resource "aws_cloudwatch_event_rule" "new_s3_file" {
+  provider    = aws.operation
   name        = "CloudGuard-Dashboard-data-transformer"
   description = "Capture new import lambda assets file upload"
   is_enabled  = true
@@ -254,6 +275,7 @@ EOF
 }
 
 resource "aws_lambda_permission" "data_transformer_allow_execution_from_cloudwatch" {
+  provider      = aws.operation
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.data_transformer_lambda.function_name
@@ -262,6 +284,7 @@ resource "aws_lambda_permission" "data_transformer_allow_execution_from_cloudwat
 }
 
 resource "aws_cloudwatch_event_target" "cloudguard_dashboard_transformer_eventbridge_target" {
+  provider  = aws.operation
   target_id = "bugedcoldstart"
   arn       = aws_lambda_function.data_transformer_lambda.arn
   rule      = aws_cloudwatch_event_rule.new_s3_file.name
@@ -269,7 +292,6 @@ resource "aws_cloudwatch_event_target" "cloudguard_dashboard_transformer_eventbr
 
 # Role needed to query account in the org. Resides on the master account
 resource "aws_iam_role" "query_org_accounts" {
-  provider = aws.management
   name     = "CSPM-transformation-Lambda-Query-Org-Accounts"
 
   assume_role_policy = jsonencode({
@@ -297,14 +319,14 @@ resource "aws_iam_role" "query_org_accounts" {
 
 # Attached AWS managed AWSOrganizationsReadOnlyAccess policy to the Query Org Accounts Role
 resource "aws_iam_role_policy_attachment" "query_org_accounts_access" {
-  provider   = aws.management
   role       = aws_iam_role.query_org_accounts.name
   policy_arn = "arn:aws:iam::aws:policy/AWSOrganizationsReadOnlyAccess"
 }
 
 # CloudGuardDataTransformer Lambda role
 resource "aws_iam_role" "data_transformer_lambda_exec_role" {
-  name = "CloudGuardDataTransformerExecutionRole"
+  provider = aws.operation
+  name     = "CloudGuardDataTransformerExecutionRole"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -322,7 +344,8 @@ resource "aws_iam_role" "data_transformer_lambda_exec_role" {
 
 # Assume role right for the org list account
 resource "aws_iam_policy" "cloudguard_dashboard_data_transformer_policies" {
-  name = "CloudGuardDataTransformerAssumeRole"
+  provider = aws.operation
+  name     = "CloudGuardDataTransformerAssumeRole"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -337,27 +360,32 @@ resource "aws_iam_policy" "cloudguard_dashboard_data_transformer_policies" {
 
 # Attach policies
 resource "aws_iam_role_policy_attachment" "data_transformer_lambda_assumerole" {
+  provider   = aws.operation
   role       = aws_iam_role.data_transformer_lambda_exec_role.name
   policy_arn = aws_iam_policy.cloudguard_dashboard_data_transformer_policies.arn
 }
 
 resource "aws_iam_role_policy_attachment" "data_transformer_basic_execution_policy" {
+  provider   = aws.operation
   role       = aws_iam_role.data_transformer_lambda_exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "data_transformer_parameter_store_readonly_policy" {
+  provider   = aws.operation
   role       = aws_iam_role.data_transformer_lambda_exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
 }
 
 # Attach the LambdaPermissions IAM policy to DataTransformer Lambda Execution Role
 resource "aws_iam_role_policy_attachment" "data_transformer_lambda_access" {
+  provider   = aws.operation
   role       = aws_iam_role.data_transformer_lambda_exec_role.name
   policy_arn = aws_iam_policy.cloudguard_dashboard_lambda_policies.arn
 }
 
 resource "aws_lambda_function" "data_transformer_lambda" {
+  provider      = aws.operation
   function_name = "CloudGuardDataTransformer"
   description   = "Transforms raw CloudGuard data for consumption by QuickSight"
 
@@ -387,15 +415,17 @@ resource "aws_lambda_function" "data_transformer_lambda" {
 
 # Upload quicksight configuration manifest in s3
 resource "aws_s3_bucket_object" "manifest_upload" {
-  bucket  = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
-  key     = "manifest.json"
-  acl     = "private"
-  content = templatefile("resources/manifest.json", { account_id = data.aws_caller_identity.current.id, region = var.aws_region })
-  etag    = filemd5("resources/manifest.json")
+  provider = aws.operation
+  bucket   = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
+  key      = "manifest.json"
+  acl      = "private"
+  content  = templatefile("${path.module}/resources/manifest.json", { account_id = data.aws_caller_identity.current.id, region = var.aws_region })
+  etag     = filemd5("${path.module}/resources/manifest.json")
 }
 
 # Creating the DataSource
 resource "aws_quicksight_data_source" "default" {
+  provider       = aws.operation
   data_source_id = "CSPM-Dashboard"
   name           = "CSPM Assets list by type and account"
   type           = "S3"
@@ -421,7 +451,8 @@ resource "aws_quicksight_data_source" "default" {
 
 # Quicksight execution role
 resource "aws_iam_role" "quicksight_service_role" {
-  name = "CloudGuardQuicksightserviceRole"
+  provider = aws.operation
+  name     = "CloudGuardQuicksightserviceRole"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
@@ -439,7 +470,8 @@ resource "aws_iam_role" "quicksight_service_role" {
 
 # s3 access right for Quicksight
 resource "aws_iam_policy" "cloudguard_quicksight_s3_policy" {
-  name = "CloudGuardQuicksightS3Policy"
+  provider = aws.operation
+  name     = "CloudGuardQuicksightS3Policy"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -473,11 +505,13 @@ resource "aws_iam_policy" "cloudguard_quicksight_s3_policy" {
 
 #Policy attachment
 resource "aws_iam_role_policy_attachment" "Cloudguard_quicksight_default_access_rights" {
+  provider   = aws.operation
   role       = aws_iam_role.quicksight_service_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSQuicksightAthenaAccess"
 }
 
 resource "aws_iam_role_policy_attachment" "Cloudguard_quicksight_s3_access_rights" {
+  provider   = aws.operation
   role       = aws_iam_role.quicksight_service_role.name
   policy_arn = resource.aws_iam_policy.cloudguard_quicksight_s3_policy.arn
 }
@@ -488,6 +522,7 @@ resource "aws_iam_role_policy_attachment" "Cloudguard_quicksight_s3_access_right
 
 # Quicksight reader access role
 resource "aws_iam_role" "quicksight_reader_role" {
+  provider             = aws.operation
   name                 = "BCGOV_CORE_Quicksight_reader"
   max_session_duration = 21600
 
@@ -517,6 +552,7 @@ EOF
 
 # Quicksight author access role
 resource "aws_iam_role" "quicksight_author_role" {
+  provider             = aws.operation
   name                 = "BCGOV_CORE_Quicksight_author"
   max_session_duration = 21600
 
@@ -545,6 +581,7 @@ EOF
 }
 
 resource "aws_iam_role" "quicksight_admin_role" {
+  provider             = aws.operation
   name                 = "BCGOV_CORE_Quicksight_admin"
   max_session_duration = 21600
 
@@ -574,7 +611,8 @@ EOF
 
 # Quicksight reader access policy
 resource "aws_iam_policy" "quicksight_reader_access_policy" {
-  name = "QuicksightReaderAccess"
+  provider = aws.operation
+  name     = "QuicksightReaderAccess"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -597,7 +635,8 @@ resource "aws_iam_policy" "quicksight_reader_access_policy" {
 
 # Quicksight author access policy
 resource "aws_iam_policy" "quicksight_author_access_policy" {
-  name = "QuicksightAuthorAccess"
+  provider = aws.operation
+  name     = "QuicksightAuthorAccess"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -619,7 +658,8 @@ resource "aws_iam_policy" "quicksight_author_access_policy" {
 }
 
 resource "aws_iam_policy" "quicksight_admin_access_policy" {
-  name = "QuicksightAdminAccess"
+  provider = aws.operation
+  name     = "QuicksightAdminAccess"
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -634,16 +674,19 @@ resource "aws_iam_policy" "quicksight_admin_access_policy" {
 
 # Quicksight access Policies attachment
 resource "aws_iam_role_policy_attachment" "quicksight_reader_access" {
+  provider   = aws.operation
   role       = aws_iam_role.quicksight_reader_role.name
   policy_arn = aws_iam_policy.quicksight_reader_access_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "quicksight_author_access" {
+  provider   = aws.operation
   role       = aws_iam_role.quicksight_author_role.name
   policy_arn = aws_iam_policy.quicksight_author_access_policy.arn
 }
 
 resource "aws_iam_role_policy_attachment" "quicksight_admin_access" {
+  provider   = aws.operation
   role       = aws_iam_role.quicksight_admin_role.name
   policy_arn = aws_iam_policy.quicksight_admin_access_policy.arn
 }
@@ -651,6 +694,7 @@ resource "aws_iam_role_policy_attachment" "quicksight_admin_access" {
 # Quicksight users creation
 
 resource "aws_quicksight_user" "readers" {
+  provider      = aws.operation
   for_each      = toset(var.reader_list)
   session_name  = each.key
   email         = data.keycloak_user.this[each.key].email
@@ -661,6 +705,7 @@ resource "aws_quicksight_user" "readers" {
 }
 
 resource "aws_quicksight_user" "authors" {
+  provider      = aws.operation
   for_each      = toset(var.author_list)
   session_name  = each.key
   email         = data.keycloak_user.this[each.key].email
@@ -671,6 +716,7 @@ resource "aws_quicksight_user" "authors" {
 }
 
 resource "aws_quicksight_user" "admins" {
+  provider      = aws.operation
   for_each      = toset(var.admin_list)
   session_name  = each.key
   email         = data.keycloak_user.this[each.key].email
@@ -682,23 +728,27 @@ resource "aws_quicksight_user" "admins" {
 
 # Quicksight groups creation
 resource "aws_quicksight_group" "reader" {
-  group_name = "readers"
+  provider    = aws.operation
+  group_name  = "readers"
   description = "This group for the reader is not really used because user can directly access the public CSPM Dashboard"
 }
 
 resource "aws_quicksight_group" "author" {
-  group_name = "authors"
+  provider    = aws.operation
+  group_name  = "authors"
   description = "Group link with the CSPM Dashboard; need to be linked on the first execution"
 }
 
 resource "aws_quicksight_group" "admin" {
-  group_name = "admins"
+  provider    = aws.operation
+  group_name  = "admins"
   description = "Group link with the CSPM Dashboard; need to be linked on the first execution"
 }
 
 # Quicksight user group maping
 
 resource "aws_quicksight_group_membership" "readers" {
+  provider    = aws.operation
   for_each    = toset(var.reader_list)
   group_name  = "readers"
   member_name = "${aws_iam_role.quicksight_reader_role.name}/${each.key}"
@@ -710,6 +760,7 @@ resource "aws_quicksight_group_membership" "readers" {
 }
 
 resource "aws_quicksight_group_membership" "authors" {
+  provider    = aws.operation
   for_each    = toset(var.author_list)
   group_name  = "authors"
   member_name = "${aws_iam_role.quicksight_author_role.name}/${each.key}"
@@ -721,6 +772,7 @@ resource "aws_quicksight_group_membership" "authors" {
 }
 
 resource "aws_quicksight_group_membership" "admins" {
+  provider    = aws.operation
   for_each    = toset(var.admin_list)
   group_name  = "admins"
   member_name = "${aws_iam_role.quicksight_admin_role.name}/${each.key}"

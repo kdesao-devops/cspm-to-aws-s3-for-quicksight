@@ -30,11 +30,12 @@ Please follow this procedure for *new account deployement* until a better integr
     1. Export the necessary variable:
         - AWS credential of the main account
         - AWS Credential of the management account (see variable for more detail)
-        - CloudGuard API Key
+    
+    2. Make sure the Parameter Store entry : `/cloudguard_dashboard/cloudguard_api_keys` is created in the `Operations` account (Example: {"apiKeyId":"<Your_cloudGuard_api_secret>", "apiKeySecret":"<Your_cloudguard_api_secret>"})
         
-    2. Terraform apply (on first execution quicksight data source creation will fail.)
+    3. Terraform apply (on first execution quicksight data source creation will fail.)
 
-    3. Coonect to AWS Quicksight and launch the service for the account:
+    4. Coonect to AWS Quicksight and launch the service for the account:
         - Subscribe to Entreprise
         - Select region:"ca-central-1"
         - Select Authentication Method: "Use IAM federated identities only"
@@ -44,13 +45,13 @@ Please follow this procedure for *new account deployement* until a better integr
         - Finish
 
 
-    4. Execute the terraform a second time.
+    6. Execute the terraform a second time.
 
-    5. Now the DataSource is created in Quicksight, You can now create a new dataset and use "CSPM Assets list by type and account", and with this dataset create a new analyses.
+    7. Now the DataSource is created in Quicksight, You can now create a new dataset and use "CSPM Assets list by type and account", and with this dataset create a new analyses.
     Attention: Change the type of account id, Indeed the account id is labelled as a integer but it's a string. You need to change it on the data prview.  
     Also, you need to add the shceduled refresh for Quicksight to import the new data everyday.
 
-    6. **BEWARE** On the first execution the Dashboard must be link with the Authors and Admins groups. <Dashboard> -> <Share> -> <select "authors" and "admin">
+    8. **BEWARE** On the first execution the Dashboard must be link with the Authors and Admins groups. <Dashboard> -> <Share> -> <select "authors" and "admin">
 
 ## Please note
 The CSPM API provide a greater list of assets than the Web UI. A filter has been created in Quicksight to render the same view.

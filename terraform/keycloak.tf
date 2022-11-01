@@ -2,13 +2,6 @@ locals {
   user_list   = concat(var.reader_list, var.author_list, var.admin_list)
 }
 
-provider "keycloak" {
-  client_id     = var.kc_terraform_auth_client_id
-  client_secret = var.kc_terraform_auth_client_password
-  url           = var.kc_base_url
-  realm         = var.kc_realm
-}
-
 # Get Unique ID in keycloak
 data "keycloak_realm" "realm" {
   realm    = var.kc_realm
