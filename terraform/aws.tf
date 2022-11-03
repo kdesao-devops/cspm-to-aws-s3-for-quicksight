@@ -3,11 +3,6 @@ locals {
   operations_account = local.core_accounts["Operations"]
 }
 
-# Providers
-provider "aws" {
-  region = var.aws_region
-}
-
 # Account that has access to the organization root to get the account list
 provider "aws" {
   alias  = "operation"
