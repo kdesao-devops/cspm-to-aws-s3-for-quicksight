@@ -23,7 +23,6 @@ module "lz_info" {
 
 
 data "aws_caller_identity" "current" {
-  provider = aws
 }
 
 data "aws_caller_identity" "operation" {
@@ -32,10 +31,14 @@ data "aws_caller_identity" "operation" {
 
 data "aws_region" "current" {}
 
+data "aws_region" "operation" {
+  provider = aws.operation
+}
+
 # S3 Bucket for Lambda asset
 resource "aws_s3_bucket" "cloudguard_dashboard_lambda_bucket" {
   provider      = aws.operation
-  bucket        = "cloudguard-dashboard-lambda-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
+  bucket        = "cloudguard-dashboard-lambda-${data.aws_caller_identity.operation.account_id}-${data.aws_region.operation.name}"
   acl           = "private"
   force_destroy = false
 }
@@ -43,7 +46,7 @@ resource "aws_s3_bucket" "cloudguard_dashboard_lambda_bucket" {
 # S3 Bucket for storing CloudGuard data
 resource "aws_s3_bucket" "cloudguard_dashboard_data_bucket" {
   provider      = aws.operation
-  bucket        = "cloudguard-dashboard-data-${data.aws_caller_identity.current.account_id}-${data.aws_region.current.name}"
+  bucket        = "cloudguard-dashboard-data-${data.aws_caller_identity.operation.account_id}-${data.aws_region.operation.name}"
   acl           = "private"
   force_destroy = false
 }
@@ -414,7 +417,7 @@ resource "aws_s3_bucket_object" "manifest_upload" {
   bucket   = aws_s3_bucket.cloudguard_dashboard_data_bucket.id
   key      = "manifest.json"
   acl      = "private"
-  content  = templatefile("${path.module}/resources/manifest.json", { account_id = data.aws_caller_identity.current.id, region = var.aws_region })
+  content  = templatefile("${path.module}/resources/manifest.json", { account_id = data.aws_caller_identity.operation.id, region = var.aws_region })
   etag     = filemd5("${path.module}/resources/manifest.json")
 }
 
@@ -440,7 +443,7 @@ resource "aws_quicksight_data_source" "default" {
       "quicksight:DescribeDataSourcePermissions",
       "quicksight:PassDataSource",
     ]
-    principal = "arn:aws:quicksight:ca-central-1:${data.aws_caller_identity.current.id}:user/default/BCGOV_CORE_Quicksight_admin/${var.admin_list[0]}"
+    principal = "arn:aws:quicksight:ca-central-1:${data.aws_caller_identity.operation.id}:user/default/BCGOV_CORE_Quicksight_admin/${var.admin_list[0]}"
   }
 }
 
@@ -528,7 +531,7 @@ resource "aws_iam_role" "quicksight_reader_role" {
         {
             "Effect": "Allow",
             "Principal": {
-                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.operation.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
             },
             "Action": "sts:AssumeRoleWithSAML",
             "Condition": {
@@ -558,7 +561,7 @@ resource "aws_iam_role" "quicksight_author_role" {
         {
             "Effect": "Allow",
             "Principal": {
-                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.operation.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
             },
             "Action": "sts:AssumeRoleWithSAML",
             "Condition": {
@@ -587,7 +590,7 @@ resource "aws_iam_role" "quicksight_admin_role" {
         {
             "Effect": "Allow",
             "Principal": {
-                "Federated": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
+                "Federated": "arn:aws:iam::${data.aws_caller_identity.operation.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm}"
             },
             "Action": "sts:AssumeRoleWithSAML",
             "Condition": {

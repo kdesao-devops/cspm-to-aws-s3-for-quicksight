@@ -23,24 +23,23 @@ data "keycloak_user" "this" {
 resource "keycloak_role" "reader_role" {
   realm_id  = data.keycloak_realm.realm.id
   client_id = data.keycloak_openid_client.realm_management.id
-  name        = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm},${aws_iam_role.quicksight_reader_role.arn}"
+  name        = "arn:aws:iam::${data.aws_caller_identity.operation.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm},${aws_iam_role.quicksight_reader_role.arn}"
   description = "Readers Role access for Quicksight"
 }
 
 resource "keycloak_role" "author_role" {
   realm_id  = data.keycloak_realm.realm.id
   client_id = data.keycloak_openid_client.realm_management.id
-  name        = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm},${aws_iam_role.quicksight_author_role.arn}"
+  name        = "arn:aws:iam::${data.aws_caller_identity.operation.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm},${aws_iam_role.quicksight_author_role.arn}"
   description = "Author access for Quicksight"
 }
 
 resource "keycloak_role" "admin_role" {
   realm_id  = data.keycloak_realm.realm.id
   client_id = data.keycloak_openid_client.realm_management.id
-  name        = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm},${aws_iam_role.quicksight_admin_role.arn}"
+  name        = "arn:aws:iam::${data.aws_caller_identity.operation.account_id}:saml-provider/BCGovKeyCloak-${var.kc_realm},${aws_iam_role.quicksight_admin_role.arn}"
   description = "Admin access for Quicksight"
 }
-
 
 ## Creation of the groups
 resource "keycloak_group" "reader_group" {
